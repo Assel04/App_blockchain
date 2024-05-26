@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkedLd</title>
+
+    <!-- CSS Link  -->
+    <link rel="stylesheet" href="style.css">
+    <link rel="shortcut icon" href="home-images/favicon.png">
+    <!-- Font Awesome CDN  -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.3.0/css/all.min.css">
+    <style>
+        /* Add your custom styles here if needed */
+    </style>
+</head>
+<body>
+<header>
+    <nav>
+        <input type="checkbox" id="check">
+        <label for="check" id="check-btn">
+            <i class="fas fa-bars"></i>
+        </label>
+        <img src="home-images/Interior-logo.png" alt="logo">
+        <ul>
+            <li><a href="#">About Us</a></li>
+            <li><a href="#">Contact</a></li>
+        </ul>
+    </nav>
+    <div class="head">
+        <h1>
+            Welcome to our website!<br>
+            Find your like-minded people
+        </h1>
+        <p>Our website stores thousands of profiles of real professionals in their field.</p>
+        <button onclick="signMessage()">Login</button>
+        <p id="p1"></p>
+    </div>
+</header>
+
+<!-- JavaScript Code -->
+<script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.10.5/dist/web3.min.js"></script>
+<script>
+    async function connectToWallet() {
+        if ("solana" in window) {
+            await window.solana.connect();
+
+            const provider = window.solana;
+
+
+            if (provider.isPhantom) {
+                console.log("Is Phantom installed? ", provider.isPhantom);
+                return provider;
+            }
+        } else {
+            document.write('Install https://www.phantom.app/');
+        }
+    }
+
+    async function getNonce() {
+        const response = await fetch('/api/nonce');
+        const data = await response.json();
+        return data.nonce;
+    }
+
+    // Array conversion function
+    function convertToUint8Array(str) {
+        const arr = [];
+        for (let i = 0; i < str.length; i++) {
+            arr.push(str.charCodeAt(i));
+        }
+        return new Uint8Array(arr);
+    }
+
+    async function signMessage() {
+        const provider = await connectToWallet();
+
+        if (!provider || !provider.isPhantom) {
+            return;
+        }
+
+        const nonce = await getNonce();
+        console.log(nonce);
+
+        const publicKey = provider.publicKey.toBase58();
+
+        const message = `Signing this message to confirm my identity. Nonce: ${nonce}`;
+
+        const encoder = new TextEncoder();
+        const messageArray = encoder.encode(message);
+
+        const signedMessage = await provider.signMessage(messageArray);
+        console.log(signedMessage);
+
+        // assuming that signedMessage.signature is a Uint8Array
+        const signedMessageArray = signedMessage.signature;
+        console.log(signedMessageArray);
+
+        const data = { signedMessage: Array.from(signedMessageArray), message, publicKey };
+
+        console.log(JSON.stringify(data));
+
+        const response = await fetch('/login', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        const token = (await response.text()).trim().replace(/^"(.*)"$/, '$1');
+
+        window.localStorage.setItem("token", token);
+
+        const verifyResponse = await fetch('/verify', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+        });
+
+        const verificationResult = await verifyResponse.json();
+        console.log(verifyResponse);
+        if (verificationResult.message === "ok") {
+            window.location.href = '/success';
+        } else {
+            document.getElementById("p1").innerHTML = "Invalid token!";
+        }
+    }
+
+    async function addUser() {
+        const programId = 'your_program_id'; // Replace with your program ID
+        const newAccountSecretKey = 'your_secret_key'; // Replace with the new account's secret key
+        const name = 'John Doe'; // Example name
+        const profilePhoto = 'profile_photo_url'; // Example profile photo URL
+        const bio = 'Some bio text'; // Example bio text
+
+        const response = await fetch('/adduser', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                programId,
+                newAccountSecretKey,
+                name,
+                profilePhoto,
+                bio
+            })
+        });
+
+        const data = await response.json();
+        console.log(data);
+        // Handle the response as needed
+    }
+
+    async function followUser() {
+        const programId = 'your_program_id'; // Replace with your program ID
+        const followerSecretKey = 'your_secret_key'; // Replace with the follower's secret key
+        const followedPublicKey = 'followed_user_public_key'; // Replace with the public key of the user to follow
+
+        const response = await fetch('/followUser', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                programId,
+                followerSecretKey,
+                followedPublicKey
+            })
+        });
+
+        const data = await response.json();
+        console.log(data);
+        // Handle the response as needed
+    }
+</script>
+</body>
+</html>
